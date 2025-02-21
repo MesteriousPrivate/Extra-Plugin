@@ -1,25 +1,29 @@
 import asyncio
 import datetime
 import pytz
-from pyrogram import filters
+from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from config import AUTO_GCAST, LOGGER_ID
-from ChampuMusic import app
+from config import AUTO_GCAST, LOGGER_ID, API_ID, API_HASH, BOT_TOKEN
 from ChampuMusic.utils.database import get_served_chats
+
+# Bot Client
+app = Client("BroadcastBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 # Configurations
 AUTO_GCASTS = AUTO_GCAST.strip().lower() == "on"
 OWNER_ID = 1786683163
-CHANNEL_ID = "@NoxxNetwork"
+CHANNEL_ID = -1002324275347  # Direct channel ID
 
 def get_ist_time():
+    """Fetch current IST time."""
     now_utc = datetime.datetime.now(pytz.utc)
     return now_utc.astimezone(pytz.timezone("Asia/Kolkata"))
 
 async def fetch_last_post():
-    """Fetch the last post from the specified channel."""
-    async for message in app.get_chat_history(CHANNEL_ID, limit=1):
-        return message
+    """Fetch the last post using search_messages (instead of get_chat_history)."""
+    messages = await app.search_messages(CHANNEL_ID, limit=1)
+    if messages:
+        return messages[0]  # Return the latest message
     return None
 
 async def send_message_to_chats(message):
@@ -65,3 +69,6 @@ async def manual_broadcast(_, message):
 
 if AUTO_GCASTS:
     asyncio.create_task(auto_broadcast())
+
+if __name__ == "__main__":
+    app.run()
