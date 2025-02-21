@@ -13,6 +13,7 @@ app = Client("BroadcastBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOK
 AUTO_GCASTS = AUTO_GCAST.strip().lower() == "on"
 OWNER_ID = 1786683163
 CHANNEL_ID = -1002324275347  # Direct channel ID
+FALLBACK_MESSAGE_ID = 14  # Manually defined message ID if fetching fails
 
 def get_ist_time():
     """Fetch current IST time."""
@@ -20,11 +21,20 @@ def get_ist_time():
     return now_utc.astimezone(pytz.timezone("Asia/Kolkata"))
 
 async def fetch_last_post():
-    """Fetch the last post using search_messages (instead of get_chat_history)."""
-    messages = await app.search_messages(CHANNEL_ID, limit=1)
-    if messages:
-        return messages[0]  # Return the latest message
-    return None
+    """Fetch the last post, else fallback to a defined message."""
+    try:
+        messages = await app.search_messages(CHANNEL_ID, limit=1)
+        if messages:
+            return messages[0]  # Return the latest message
+    except Exception as e:
+        print(f"⚠️ Error fetching last post: {e}")
+    
+    # If fetch fails, return the fallback message
+    try:
+        return await app.get_messages(CHANNEL_ID, FALLBACK_MESSAGE_ID)
+    except Exception as e:
+        print(f"⚠️ Error fetching fallback message: {e}")
+        return None
 
 async def send_message_to_chats(message):
     """Send the given message to all served chats."""
@@ -55,17 +65,19 @@ async def auto_broadcast():
             message = await fetch_last_post()
             if message:
                 count = await send_message_to_chats(message)
-                print(f"✅ Auto Broadcast sent to {count} chats at 2:00 PM IST.")
+                await app.send_message(OWNER_ID, f"✅ Auto Broadcast sent to {count} chats at 2:00 PM IST.")
 
 @app.on_message(filters.command("autog") & filters.user(OWNER_ID))
 async def manual_broadcast(_, message):
     """Allows the owner to manually trigger a broadcast with /autog."""
+    await message.reply_text("⏳ Starting manual broadcast... Please wait.")
+    
     msg = await fetch_last_post()
     if msg:
         count = await send_message_to_chats(msg)
         await message.reply_text(f"✅ Manual Broadcast Sent to {count} chats!")
     else:
-        await message.reply_text("❌ No message found in the channel!")
+        await message.reply_text("❌ No message found in the channel or fallback message!")
 
 if AUTO_GCASTS:
     asyncio.create_task(auto_broadcast())
